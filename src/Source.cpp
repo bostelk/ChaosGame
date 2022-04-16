@@ -4,6 +4,11 @@
 #include <unordered_map>
 #include <vector>
 
+// Microsoft Concurrency
+#include <ppl.h>
+#include <concurrent_vector.h>
+#include <concurrent_unordered_map.h>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -373,13 +378,13 @@ JuliaFunc(Eigen::Vector2f& point)
 Eigen::Vector2f
 ChaosGame(
   std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions,
+  Eigen::Vector2f point,
+  int* random,
   int numIterations = 20)
 {
-  // A random point in biunit square [-1,1].
-  Eigen::Vector2f point = Eigen::Vector2f::Random();
   for (int i = 0; i < numIterations; i++) {
     // Pick a random function to iterate.
-    int index = rand() % functions.size();
+    int index = random[i] % functions.size();
     auto function = functions[index];
     point = function(point);
   }
@@ -399,45 +404,64 @@ RenderImage(
 {
   printf("Render %s\n", filename.c_str());
 
-  std::vector<Eigen::Vector2f> points;
+  concurrency::concurrent_vector<Eigen::Vector2f> points;
   points.reserve(numPoints);
 
+  int numIterations = 20;
+
+  std::vector<int> random;
+  random.resize(numIterations * numPoints);
+
+  // Generate entropy in a single thread.
   for (int i = 0; i < numPoints; i++) {
-#if _DEBUG
-    printf("%i\n", i);
-#endif
-    Eigen::Vector2f point = ChaosGame(ifs);
+    // A random point in biunit square [-1,1].
+    Eigen::Vector2f point = Eigen::Vector2f::Random();
     points.push_back(point);
+
+    for (int j = 0; j < numIterations; j++) {
+      random[i * 20 + j] = rand();
+    }
   }
+
+  concurrency::parallel_for(
+    size_t(0),
+    size_t(numPoints),
+    [&ifs, &points, &random, &numIterations](size_t i) {
+#if _DEBUG
+      printf("Sample point: %ld\n", i);
+#endif
+      points[i] =
+        ChaosGame(ifs, points[i], random.data() + i * 20, numIterations);
+    });
 
   Image image(imageWidth, imageHeight);
   image.Allocate();
 
-  std::unordered_map<CoordKey, Pixel> pixelMap;
-  pixelMap.reserve(numPoints);
+  concurrency::concurrent_unordered_map<CoordKey, Pixel> pixelMap;
 
   // Map points to pixels.
-  for (Eigen::Vector2f& point : points) {
-    // Map from [-1,1] to [0,1].
-    Eigen::Vector2f newPoint = ((Eigen::Vector2f(1.0, 1.0) + point) / 2);
+  concurrency::parallel_for_each(begin(points), end(points), [&pixelMap, &image](const Eigen::Vector2f point) {
+      // Map from [-1,1] to [0,1].
+      Eigen::Vector2f newPoint = ((Eigen::Vector2f(1.0, 1.0) + point) / 2);
 
-    // Clamp point to bounds.
-    for (int i = 0; i < newPoint.size(); i++) {
-      newPoint(i) = Saturate01(newPoint[i]);
-    }
+      // Clamp point to bounds.
+      for (int i = 0; i < newPoint.size(); i++) {
+          newPoint(i) = Saturate01(newPoint[i]);
+      }
 
-    // Round to nearest pixel.
-    int x = std::lroundf(newPoint[0] * (image.Width - 1));
-    int y = std::lroundf(newPoint[1] * (image.Height - 1));
+      // Round to nearest pixel.
+      int x = std::lroundf(newPoint[0] * (image.Width - 1));
+      int y = std::lroundf(newPoint[1] * (image.Height - 1));
 
-    CoordKey key(x, y);
+      CoordKey key(x, y);
 
-    if (pixelMap.count(key) > 0) {
-      pixelMap[key].Density += 1;
-    } else {
-      pixelMap[key] = Pixel(Eigen::Vector2i(x, y));
-    }
-  }
+      if (pixelMap.count(key) > 0) {
+          pixelMap[key].Density += 1;
+      }
+      else {
+          pixelMap[key] = Pixel(Eigen::Vector2i(x, y));
+      }
+  });
 
   // Populate pixels.
   std::vector<Pixel> pixels;
@@ -469,10 +493,18 @@ main(void)
 {
   srand(420);
 
+  int numPoints = 5e7;
+  int imageDim = 4096;
   /*
-    RenderImage(
-      "Sierpinski.png", Sierpinski(), IdentityColorMap, 5e6, 1024, 1024);
-  */
+    RenderImage("Sierpinski.png",
+                Sierpinski(),
+                IdentityColorMap,
+                numPoints,
+                imageDim,
+                imageDim);
+
+    return 0;
+    */
 
   Eigen::Affine2f t0;
   t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404,
@@ -480,9 +512,6 @@ main(void)
   Eigen::Affine2f t1;
   t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0,
     0, 1;
-
-  int numPoints = 5e7;
-  int imageDim = 4096;
 
   /*
     RenderImage("Affine0-Position.png",
@@ -497,7 +526,7 @@ main(void)
                 numPoints,
                 imageDim,
                 imageDim);
-  */
+                */
   RenderImage("Affine0-Spherical-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
               DensityColorMap,
@@ -523,14 +552,12 @@ main(void)
                 numPoints,
                 imageDim,
                 imageDim);
-  */
   RenderImage("Affine0-Spiral-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), SpiralFunc),
               DensityColorMap,
               numPoints,
               imageDim,
               imageDim);
-  /*
   RenderImage("Affine0-Hyperbolic-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), HyperbolicFunc),
               DensityColorMap,
