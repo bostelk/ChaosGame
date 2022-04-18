@@ -283,7 +283,7 @@ ChaosGame(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functio
 {
     for (int i = 0; i < numIterations; i++) {
         // Pick a random function to iterate.
-        int index = random[i] % functions.size();
+        int index = random[i];
         auto function = functions[index];
         point = function(point);
     }
@@ -320,7 +320,7 @@ RenderImage(std::string filename,
         points.push_back(point);
 
         for (int j = 0; j < numIterations; j++) {
-            random[i * numIterations + j] = rand();
+            random[i * numIterations + j] = rand() % ifs.size();
         }
     }
 
