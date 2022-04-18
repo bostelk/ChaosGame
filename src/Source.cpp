@@ -1,15 +1,15 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <chrono>
 #include <cstdio>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
-#include <chrono>
-#include <iostream>
 
 // Microsoft Concurrency
-#include <ppl.h>
-#include <concurrent_vector.h>
 #include <concurrent_unordered_map.h>
+#include <concurrent_vector.h>
+#include <ppl.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -89,11 +89,7 @@ struct Color24
   }
 
   // Normalized.
-  static Color24 Color24f(float R, float G, float B)
-  {
-    return Color24(
-      std::lroundf(R * 255), std::lroundf(G * 255), std::lroundf(B * 255));
-  }
+  static Color24 Color24f(float R, float G, float B) { return Color24(std::lroundf(R * 255), std::lroundf(G * 255), std::lroundf(B * 255)); }
 };
 
 const Color24 White(255, 255, 255);
@@ -158,8 +154,7 @@ struct Image
   void WritePixels(const std::vector<Pixel>& pixels)
   {
     for (const Pixel& pixel : pixels) {
-      size_t OffsetBytes =
-        pixel.Coord[0] * ColStrideBytes + pixel.Coord[1] * RowStrideBytes;
+      size_t OffsetBytes = pixel.Coord[0] * ColStrideBytes + pixel.Coord[1] * RowStrideBytes;
       assert(OffsetBytes < SizeBytes);
       memcpy(Data + OffsetBytes, &pixel.Color.Data, sizeof(Color24));
     }
@@ -190,30 +185,26 @@ DensityColorMap(const Pixel& p, const Image& image, int numPoints)
 #endif
   float densityNormalized = Saturate01(p.Density / (float)20); // numPoints;
   int indexLUT = std::lroundf(densityNormalized * 255);
-  return Color24(turbo_srgb_bytes[indexLUT][0],
-                 turbo_srgb_bytes[indexLUT][1],
-                 turbo_srgb_bytes[indexLUT][2]);
+  return Color24(turbo_srgb_bytes[indexLUT][0], turbo_srgb_bytes[indexLUT][1], turbo_srgb_bytes[indexLUT][2]);
 };
 
 std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>
 Sierpinski()
 {
-  std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> functions = {
-    [](Eigen::Vector2f& point) {
-      Eigen::Vector2f newPoint = point / 2;
-      return newPoint;
-    },
+  std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> functions = { [](Eigen::Vector2f& point) {
+                                                                               Eigen::Vector2f newPoint = point / 2;
+                                                                               return newPoint;
+                                                                             },
 
-    [](Eigen::Vector2f& point) {
-      Eigen::Vector2f newPoint = (point + Eigen::Vector2f(1, 0)) / 2;
-      return newPoint;
-    },
+                                                                              [](Eigen::Vector2f& point) {
+                                                                                Eigen::Vector2f newPoint = (point + Eigen::Vector2f(1, 0)) / 2;
+                                                                                return newPoint;
+                                                                              },
 
-    [](Eigen::Vector2f& point) {
-      Eigen::Vector2f newPoint = (point + Eigen::Vector2f(0, 1)) / 2;
-      return newPoint;
-    }
-  };
+                                                                              [](Eigen::Vector2f& point) {
+                                                                                Eigen::Vector2f newPoint = (point + Eigen::Vector2f(0, 1)) / 2;
+                                                                                return newPoint;
+                                                                              } };
   return functions;
 }
 
@@ -233,19 +224,16 @@ AffineTransformations(std::vector<Eigen::Affine2f> transforms)
 }
 
 std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>
-CurryAll(
-  std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> functions,
-  std::function<Eigen::Vector2f(Eigen::Vector2f&)> func)
+CurryAll(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> functions, std::function<Eigen::Vector2f(Eigen::Vector2f&)> func)
 {
   std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> newFunctions;
   newFunctions.reserve(functions.size());
 
   for (std::function<Eigen::Vector2f(Eigen::Vector2f&)> function : functions) {
-    std::function<Eigen::Vector2f(Eigen::Vector2f&)> newFunction =
-      [function, func](Eigen::Vector2f& point) {
-        Eigen::Vector2f newPoint = function(point);
-        return func(newPoint);
-      };
+    std::function<Eigen::Vector2f(Eigen::Vector2f&)> newFunction = [function, func](Eigen::Vector2f& point) {
+      Eigen::Vector2f newPoint = function(point);
+      return func(newPoint);
+    };
     newFunctions.push_back(newFunction);
   }
   return newFunctions;
@@ -341,8 +329,7 @@ HyperbolicFunc(Eigen::Vector2f& point)
 {
   float r = point.stableNorm();
   float theta = atan(point[1] / point[0]);
-  Eigen::Vector2f newPoint((cos(theta) + sin(r)) / r,
-                           (cos(theta) - sin(r)) / r);
+  Eigen::Vector2f newPoint((cos(theta) + sin(r)) / r, (cos(theta) - sin(r)) / r);
   return newPoint;
 }
 
@@ -369,20 +356,13 @@ JuliaFunc(Eigen::Vector2f& point)
 {
   float r = point.stableNorm();
   float theta = atan(point[1] / point[0]);
-  float omega = (rand() % 1)
-                  ? 0
-                  : PI; // random either 0 or pi (complex square root branch).
-  Eigen::Vector2f newPoint(sqrt(r) * cos(theta / 2 + omega),
-                           sqrt(r) * sin(theta / 2 + omega));
+  float omega = (rand() % 1) ? 0 : PI; // random either 0 or pi (complex square root branch).
+  Eigen::Vector2f newPoint(sqrt(r) * cos(theta / 2 + omega), sqrt(r) * sin(theta / 2 + omega));
   return newPoint;
 }
 
 Eigen::Vector2f
-ChaosGame(
-  std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions,
-  Eigen::Vector2f point,
-  int* random,
-  int numIterations = 20)
+ChaosGame(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, Eigen::Vector2f point, int* random, int numIterations = 20)
 {
   for (int i = 0; i < numIterations; i++) {
     // Pick a random function to iterate.
@@ -395,14 +375,12 @@ ChaosGame(
 }
 
 void
-RenderImage(
-  std::string filename,
-  std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> ifs,
-  std::function<Color24(const Pixel& p, const Image& image, int numPoints)>
-    colorMap,
-  int numPoints,
-  int imageWidth,
-  int imageHeight)
+RenderImage(std::string filename,
+            std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> ifs,
+            std::function<Color24(const Pixel& p, const Image& image, int numPoints)> colorMap,
+            int numPoints,
+            int imageWidth,
+            int imageHeight)
 {
   printf("Render image: %s\n", filename.c_str());
 
@@ -433,16 +411,12 @@ RenderImage(
 
   start_t = std::chrono::high_resolution_clock::now();
 
-  concurrency::parallel_for(
-    size_t(0),
-    size_t(numPoints),
-    [&ifs, &points, &random, &numIterations](size_t i) {
+  concurrency::parallel_for(size_t(0), size_t(numPoints), [&ifs, &points, &random, &numIterations](size_t i) {
 #if _DEBUG
-      printf("Sample point: %ld\n", i);
+    printf("Sample point: %ld\n", i);
 #endif
-      points[i] =
-        ChaosGame(ifs, points[i], random.data() + i * numIterations, numIterations);
-    });
+    points[i] = ChaosGame(ifs, points[i], random.data() + i * numIterations, numIterations);
+  });
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
@@ -457,26 +431,25 @@ RenderImage(
 
   // Map points to pixels.
   concurrency::parallel_for_each(begin(points), end(points), [&pixelMap, &image](const Eigen::Vector2f point) {
-      // Map from [-1,1] to [0,1].
-      Eigen::Vector2f newPoint = ((Eigen::Vector2f(1.0, 1.0) + point) / 2);
+    // Map from [-1,1] to [0,1].
+    Eigen::Vector2f newPoint = ((Eigen::Vector2f(1.0, 1.0) + point) / 2);
 
-      // Clamp point to bounds.
-      for (int i = 0; i < newPoint.size(); i++) {
-          newPoint(i) = Saturate01(newPoint[i]);
-      }
+    // Clamp point to bounds.
+    for (int i = 0; i < newPoint.size(); i++) {
+      newPoint(i) = Saturate01(newPoint[i]);
+    }
 
-      // Round to nearest pixel.
-      int x = std::lroundf(newPoint[0] * (image.Width - 1));
-      int y = std::lroundf(newPoint[1] * (image.Height - 1));
+    // Round to nearest pixel.
+    int x = std::lroundf(newPoint[0] * (image.Width - 1));
+    int y = std::lroundf(newPoint[1] * (image.Height - 1));
 
-      CoordKey key(x, y);
+    CoordKey key(x, y);
 
-      if (pixelMap.count(key) > 0) {
-          pixelMap[key].Density += 1;
-      }
-      else {
-          pixelMap[key] = Pixel(Eigen::Vector2i(x, y));
-      }
+    if (pixelMap.count(key) > 0) {
+      pixelMap[key].Density += 1;
+    } else {
+      pixelMap[key] = Pixel(Eigen::Vector2i(x, y));
+    }
   });
 
   end_t = std::chrono::high_resolution_clock::now();
@@ -506,12 +479,7 @@ RenderImage(
 
   image.WritePixels(pixels);
 
-  stbi_write_png(filename.c_str(),
-                 image.Width,
-                 image.Height,
-                 image.Channels,
-                 image.Data,
-                 image.RowStrideBytes);
+  stbi_write_png(filename.c_str(), image.Width, image.Height, image.Channels, image.Data, image.RowStrideBytes);
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
@@ -521,79 +489,65 @@ RenderImage(
 }
 
 void
-RenderAnimation(
-    std::string filename,
-    std::function<Color24(const Pixel& p, const Image& image, int numPoints)>
-    colorMap,
-    int numPoints,
-    int imageWidth,
-    int imageHeight,
-    int numFrames)
+RenderAnimation(std::string filename, std::function<Color24(const Pixel& p, const Image& image, int numPoints)> colorMap, int numPoints, int imageWidth, int imageHeight, int numFrames)
 {
-    float theta = 0.0;
+  float theta = 0.0;
 
-    printf("Render animation: %i\n", numFrames);
+  printf("Render animation: %i\n", numFrames);
 
-    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++)
-    {
-        auto start = std::chrono::high_resolution_clock::now();
+  for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+    auto start = std::chrono::high_resolution_clock::now();
 
-        Eigen::Affine2f t0;
-        t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404,
-            0, 0, 1;
-        Eigen::Affine2f t1;
-        t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0,
-            0, 1;
+    Eigen::Affine2f t0;
+    t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404, 0, 0, 1;
+    Eigen::Affine2f t1;
+    t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0, 0, 1;
 
-        Eigen::Rotation2D<float> rot2(theta * PI);
-        t0.rotate(rot2);
-        t1.rotate(rot2);
+    Eigen::Rotation2D<float> rot2(theta * PI);
+    t0.rotate(rot2);
+    t1.rotate(rot2);
 
-        char buffer[2048];
-        memset(buffer, 0, 2048);
+    char buffer[2048];
+    memset(buffer, 0, 2048);
 
-        snprintf(buffer, 2048, "output/frame%04d.png", frameIndex);
+    snprintf(buffer, 2048, "output/frame%04d.png", frameIndex);
 
-        RenderImage(std::string(buffer, 2048),
-            CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
-            colorMap,
-            numPoints,
-            imageWidth,
-            imageHeight);
+    RenderImage(std::string(buffer, 2048), CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc), colorMap, numPoints, imageWidth, imageHeight);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto int_s = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        std::cout << "Rendered in " << int_s.count() << " seconds " << "(" << frameIndex << "/" << numFrames << ")." << std::endl;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto int_s = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    std::cout << "Rendered in " << int_s.count() << " seconds "
+              << "(" << frameIndex << "/" << numFrames << ")." << std::endl;
 
-        theta += 0.0001;
-    }
+    theta += 0.0001;
+  }
 }
 
 int
 main(void)
 {
-    srand(420);
+  srand(420);
 
-    int numPoints = 5e5;
-    int imageDim = 512;
+  int numPoints = 5e5;
+  int imageDim = 512;
 
-    float frameTime = 1 / 60.0f;
-    float minute = 0.5;
-    float seconds = minute * 60;
-    int numFrames = std::lroundf(seconds / frameTime);
+  float frameTime = 1 / 60.0f;
+  float minute = 0.5;
+  float seconds = minute * 60;
+  int numFrames = std::lroundf(seconds / frameTime);
 
-    RenderAnimation("Affine0", DensityColorMap, numPoints, imageDim, imageDim, numFrames);
+  RenderAnimation("Affine0", DensityColorMap, numPoints, imageDim, imageDim, numFrames);
 
-    /*
-      RenderImage("Sierpinski.png",
-                  Sierpinski(),
-                  IdentityColorMap,
-                  numPoints,
-                  imageDim,
-                  imageDim);
+  /*
+    RenderImage("Sierpinski.png",
+                Sierpinski(),
+                IdentityColorMap,
+                numPoints,
+                imageDim,
+                imageDim);
 
-      return 0;
-      */
+    return 0;
+    */
 
   /*
     RenderImage("Affine0-Position.png",
@@ -608,14 +562,14 @@ main(void)
                 numPoints,
                 imageDim,
                 imageDim);
-                */
+
   RenderImage("Affine0-Spherical-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
               DensityColorMap,
               numPoints,
               imageDim,
               imageDim);
-  /*
+
     RenderImage("Affine0-Polar-Density.png",
                 CurryAll(AffineTransformations({ t0, t1 }), PolarFunc),
                 DensityColorMap,
