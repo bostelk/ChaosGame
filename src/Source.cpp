@@ -520,30 +520,80 @@ RenderImage(
   image.Release();
 }
 
+void
+RenderAnimation(
+    std::string filename,
+    std::function<Color24(const Pixel& p, const Image& image, int numPoints)>
+    colorMap,
+    int numPoints,
+    int imageWidth,
+    int imageHeight,
+    int numFrames)
+{
+    float theta = 0.0;
+
+    printf("Render animation: %i\n", numFrames);
+
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++)
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        Eigen::Affine2f t0;
+        t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404,
+            0, 0, 1;
+        Eigen::Affine2f t1;
+        t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0,
+            0, 1;
+
+        Eigen::Rotation2D<float> rot2(theta * PI);
+        t0.rotate(rot2);
+        t1.rotate(rot2);
+
+        char buffer[2048];
+        memset(buffer, 0, 2048);
+
+        snprintf(buffer, 2048, "output/frame%04d.png", frameIndex);
+
+        RenderImage(std::string(buffer, 2048),
+            CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
+            colorMap,
+            numPoints,
+            imageWidth,
+            imageHeight);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto int_s = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        std::cout << "Rendered in " << int_s.count() << " seconds " << "(" << frameIndex << "/" << numFrames << ")." << std::endl;
+
+        theta += 0.0001;
+    }
+}
+
 int
 main(void)
 {
-  srand(420);
+    srand(420);
 
-  int numPoints = 5e7;
-  int imageDim = 4096;
-  /*
-    RenderImage("Sierpinski.png",
-                Sierpinski(),
-                IdentityColorMap,
-                numPoints,
-                imageDim,
-                imageDim);
+    int numPoints = 5e5;
+    int imageDim = 512;
 
-    return 0;
-    */
+    float frameTime = 1 / 60.0f;
+    float minute = 0.5;
+    float seconds = minute * 60;
+    int numFrames = std::lroundf(seconds / frameTime);
 
-  Eigen::Affine2f t0;
-  t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404,
-    0, 0, 1;
-  Eigen::Affine2f t1;
-  t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0,
-    0, 1;
+    RenderAnimation("Affine0", DensityColorMap, numPoints, imageDim, imageDim, numFrames);
+
+    /*
+      RenderImage("Sierpinski.png",
+                  Sierpinski(),
+                  IdentityColorMap,
+                  numPoints,
+                  imageDim,
+                  imageDim);
+
+      return 0;
+      */
 
   /*
     RenderImage("Affine0-Position.png",
