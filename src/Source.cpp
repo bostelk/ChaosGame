@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
+#include <iostream>
 
 // Microsoft Concurrency
 #include <ppl.h>
@@ -402,7 +404,7 @@ RenderImage(
   int imageWidth,
   int imageHeight)
 {
-  printf("Render %s\n", filename.c_str());
+  printf("Render image: %s\n", filename.c_str());
 
   concurrency::concurrent_vector<Eigen::Vector2f> points;
   points.reserve(numPoints);
@@ -412,6 +414,8 @@ RenderImage(
   std::vector<int> random;
   random.resize(numIterations * numPoints);
 
+  auto start_t = std::chrono::high_resolution_clock::now();
+
   // Generate entropy in a single thread.
   for (int i = 0; i < numPoints; i++) {
     // A random point in biunit square [-1,1].
@@ -419,9 +423,15 @@ RenderImage(
     points.push_back(point);
 
     for (int j = 0; j < numIterations; j++) {
-      random[i * 20 + j] = rand();
+      random[i * numIterations + j] = rand();
     }
   }
+
+  auto end_t = std::chrono::high_resolution_clock::now();
+  auto int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  std::cout << "  Generated entropy in " << int_s.count() << " milliseconds." << std::endl;
+
+  start_t = std::chrono::high_resolution_clock::now();
 
   concurrency::parallel_for(
     size_t(0),
@@ -431,13 +441,19 @@ RenderImage(
       printf("Sample point: %ld\n", i);
 #endif
       points[i] =
-        ChaosGame(ifs, points[i], random.data() + i * 20, numIterations);
+        ChaosGame(ifs, points[i], random.data() + i * numIterations, numIterations);
     });
+
+  end_t = std::chrono::high_resolution_clock::now();
+  int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  std::cout << "  Sampled points in " << int_s.count() << " milliseconds." << std::endl;
 
   Image image(imageWidth, imageHeight);
   image.Allocate();
 
   concurrency::concurrent_unordered_map<CoordKey, Pixel> pixelMap;
+
+  start_t = std::chrono::high_resolution_clock::now();
 
   // Map points to pixels.
   concurrency::parallel_for_each(begin(points), end(points), [&pixelMap, &image](const Eigen::Vector2f point) {
@@ -463,6 +479,10 @@ RenderImage(
       }
   });
 
+  end_t = std::chrono::high_resolution_clock::now();
+  int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  std::cout << "  Mapped points to pixels in " << int_s.count() << " milliseconds." << std::endl;
+
   // Populate pixels.
   std::vector<Pixel> pixels;
   pixels.reserve(pixelMap.size());
@@ -471,10 +491,18 @@ RenderImage(
     pixels.push_back(kv.second);
   }
 
+  start_t = std::chrono::high_resolution_clock::now();
+
   // Map pixels to a color.
   for (Pixel& pixel : pixels) {
     pixel.Color = colorMap(pixel, image, numPoints);
   }
+
+  end_t = std::chrono::high_resolution_clock::now();
+  int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  std::cout << "  Colored pixels in " << int_s.count() << " milliseconds." << std::endl;
+
+  start_t = std::chrono::high_resolution_clock::now();
 
   image.WritePixels(pixels);
 
@@ -484,6 +512,10 @@ RenderImage(
                  image.Channels,
                  image.Data,
                  image.RowStrideBytes);
+
+  end_t = std::chrono::high_resolution_clock::now();
+  int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  std::cout << "  Write image to file in " << int_s.count() << " milliseconds." << std::endl;
 
   image.Release();
 }
