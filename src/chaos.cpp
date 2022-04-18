@@ -299,6 +299,8 @@ RenderImage(std::string filename,
     int imageWidth,
     int imageHeight)
 {
+    auto start_image = std::chrono::high_resolution_clock::now();
+
     printf("Render image: %s\n", filename.c_str());
 
     concurrency::concurrent_vector<Eigen::Vector2f> points;
@@ -404,6 +406,10 @@ RenderImage(std::string filename,
     std::cout << "  Write image to file in " << int_s.count() << " milliseconds." << std::endl;
 
     image.Release();
+
+    end_t = std::chrono::high_resolution_clock::now();
+    auto int_ms = std::chrono::duration_cast<std::chrono::seconds>(end_t - start_image);
+    std::cout << "Rendered in " << int_ms.count() << " seconds." << std::endl;
 }
 
 void
@@ -414,8 +420,6 @@ RenderAnimation(std::string filename, std::function<Color24(const Pixel& p, cons
     printf("Render animation: %i\n", numFrames);
 
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
-        auto start = std::chrono::high_resolution_clock::now();
-
         Eigen::Affine2f t0;
         t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404, 0, 0, 1;
         Eigen::Affine2f t1;
@@ -432,10 +436,7 @@ RenderAnimation(std::string filename, std::function<Color24(const Pixel& p, cons
 
         RenderImage(std::string(buffer, 2048), CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc), colorMap, numPoints, imageWidth, imageHeight);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto int_s = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        std::cout << "Rendered in " << int_s.count() << " seconds "
-            << "(" << frameIndex << "/" << numFrames << ")." << std::endl;
+        std::cout << "Rendered animate frame " << "(" << frameIndex << "/" << numFrames << ").";
 
         theta += 0.0001;
     }

@@ -13,9 +13,15 @@ main(void)
   float seconds = minute * 60;
   int numFrames = std::lroundf(seconds / frameTime);
 
+  Eigen::Affine2f t0;
+  t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404, 0, 0, 1;
+  Eigen::Affine2f t1;
+  t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0, 0, 1;
+
+
   //RenderAnimation("Affine0", DensityColorMap, numPoints, imageDim, imageDim, numFrames);
 
-
+  /*
     RenderImage("Sierpinski.png",
                 Sierpinski(),
                 IdentityColorMap,
@@ -24,6 +30,8 @@ main(void)
                 imageDim);
 
     return 0;
+
+    */
 
 
   /*
@@ -39,14 +47,14 @@ main(void)
                 numPoints,
                 imageDim,
                 imageDim);
-
+                */
   RenderImage("Affine0-Spherical-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
               DensityColorMap,
               numPoints,
               imageDim,
               imageDim);
-
+  /*
     RenderImage("Affine0-Polar-Density.png",
                 CurryAll(AffineTransformations({ t0, t1 }), PolarFunc),
                 DensityColorMap,
