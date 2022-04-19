@@ -447,10 +447,11 @@ RenderImage(std::string filename,
 
   auto start_t = std::chrono::high_resolution_clock::now();
 
+  uint64_t seed = rand();
+
   // Generate entropy in a single thread.
   for (int i = 0; i < numPoints; i++) {
-    uint64_t key = i;
-    uint64_t hash1 = hash(key, i);
+    uint64_t hash1 = hash(seed, i);
 
     // A random point in biunit square [-1,1].
     Eigen::Vector2f point = to_vec2(hash1);
