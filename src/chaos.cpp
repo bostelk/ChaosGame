@@ -351,6 +351,30 @@ ChaosGameSierpinskiISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2
   }
 }
 
+uint64_t
+hash(uint64_t key, uint64_t index)
+{
+  const uint64_t c = 0xf46053d10d8c49f5ULL; // randomly chosen odd number. probably better choices
+  uint64_t x = index;
+
+  x ^= key;
+  x *= c;
+  x ^= x >> 32;
+  x ^= key;
+  x *= c;
+  x ^= x >> 32;
+
+  return x;
+}
+
+Eigen::Vector2f
+to_vec2(uint64_t x)
+{
+  x &= 0x007FFFFF007FFFFFULL;
+  x |= 0x3f8000003f800000ULL;
+  return *((Eigen::Vector2f*)&x) - Eigen::Vector2f(1.0, 1.0);
+}
+
 void
 ChaosGameAffineISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
 {
@@ -425,8 +449,11 @@ RenderImage(std::string filename,
 
   // Generate entropy in a single thread.
   for (int i = 0; i < numPoints; i++) {
+    uint64_t key = i;
+    uint64_t hash1 = hash(key, i);
+
     // A random point in biunit square [-1,1].
-    Eigen::Vector2f point = Eigen::Vector2f::Random();
+    Eigen::Vector2f point = to_vec2(hash1);
     points.push_back(point);
 
     for (int j = 0; j < numIterations; j++) {
