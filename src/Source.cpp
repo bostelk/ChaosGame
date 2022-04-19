@@ -21,7 +21,7 @@ main(void)
 
   //RenderAnimation("Affine0", DensityColorMap, numPoints, imageDim, imageDim, numFrames);
 
-  /*
+
     RenderImage("Sierpinski.png",
                 Sierpinski(),
                 IdentityColorMap,
@@ -31,7 +31,7 @@ main(void)
 
     return 0;
 
-    */
+
 
 
   /*
@@ -47,14 +47,14 @@ main(void)
                 numPoints,
                 imageDim,
                 imageDim);
-                */
+
   RenderImage("Affine0-Spherical-Density.png",
               CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
               DensityColorMap,
               numPoints,
               imageDim,
               imageDim);
-  /*
+
     RenderImage("Affine0-Polar-Density.png",
                 CurryAll(AffineTransformations({ t0, t1 }), PolarFunc),
                 DensityColorMap,
