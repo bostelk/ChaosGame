@@ -286,7 +286,7 @@ ChaosGameFor(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& func
 {
   for (int pointIndex = 0; pointIndex < points.size(); pointIndex++) {
 #if _DEBUG
-    printf("Sample point: %ld\n", pointIndex);
+    printf("  Sample point: %ld\n", pointIndex);
 #endif
     for (int i = 0; i < numIterations; i++) {
       // Pick a random function to iterate.
@@ -302,7 +302,7 @@ ChaosGameParallelFor(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)
 {
   concurrency::parallel_for(size_t(0), size_t(points.size()), [&functions, &points, &random, &numIterations](size_t pointIndex) {
 #if _DEBUG
-    printf("Sample point: %ld\n", pointIndex);
+    printf("  Sample point: %ld\n", pointIndex);
 #endif
     for (int i = 0; i < numIterations; i++) {
       // Pick a random function to iterate.
@@ -330,7 +330,9 @@ ChaosGameSierpinskiISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2
   int remainder = points.size() % count;
 
   for (size_t pointIndex = 0; pointIndex < points.size() - count; pointIndex += count) {
-
+#if _DEBUG
+    printf("  Sample point: %ld\n", pointIndex);
+#endif
     // Initialize input buffer
     for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
       xin[inputIndex] = points[pointIndex + inputIndex][0];
