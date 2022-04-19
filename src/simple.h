@@ -32,6 +32,7 @@ namespace ispc { /* namespace */
 #if defined(__cplusplus) && (! defined(__ISPC_NO_EXTERN_C) || !__ISPC_NO_EXTERN_C )
 extern "C" {
 #endif // __cplusplus
+    extern void affine(float * xin, float * yin, int32_t * selectorin, float * transformin, float * xout, float * yout, int32_t iterations, int32_t count);
     extern void sierpinski(float * xin, float * yin, int32_t * selectorin, float * xout, float * yout, int32_t iterations, int32_t count);
     extern void simple(float * vin, float * vout, int32_t count);
 #if defined(__cplusplus) && (! defined(__ISPC_NO_EXTERN_C) || !__ISPC_NO_EXTERN_C )
