@@ -101,7 +101,7 @@ Color24
 DensityColorMap(const Pixel& p, const Image& image, int numPoints)
 {
 #if _DEBUG
-  printf("Density: %i\n", p.Density);
+  printf("  Density: %i\n", p.Density);
 #endif
   float densityNormalized = Saturate01(p.Density / (float)20); // numPoints;
   int indexLUT = std::lroundf(densityNormalized * 255);
