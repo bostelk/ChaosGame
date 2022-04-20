@@ -64,13 +64,14 @@ exFunc(Eigen::Vector2f& point);
 Eigen::Vector2f
 JuliaFunc(Eigen::Vector2f& point);
 
+void SetTRS(float* translation, float rotation, float* scale);
+
 void
-RenderImage(std::string filename,
+RenderImage(Image image,
     std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> ifs,
     std::function<Color24(const Pixel& p, const Image& image, int numPoints)> colorMap,
     int numPoints,
-    int imageWidth,
-    int imageHeight);
+    int numIterations);
 
 void
 RenderAnimation(std::string filename, std::function<Color24(const Pixel& p, const Image& image, int numPoints)> colorMap, int numPoints, int imageWidth, int imageHeight, int numFrames);

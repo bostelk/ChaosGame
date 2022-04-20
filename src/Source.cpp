@@ -5,8 +5,12 @@ main(void)
 {
   srand(420);
 
-  int numPoints = 5e6;
-  int imageDim = 512;
+  int numPoints = 5e7;
+  int numIterations = 20;
+
+  int imageDim = 2048;
+  Image image(imageDim, imageDim);
+  image.Allocate();
 
   float frameTime = 1 / 60.0f;
   float minute = 0.5;
@@ -48,12 +52,11 @@ main(void)
                 imageDim,
                 imageDim);
 */
-  RenderImage("Affine0-Spherical-Density.png",
+  RenderImage(image,
               CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc),
               DensityColorMap,
               numPoints,
-              imageDim,
-              imageDim);
+              numIterations);
   /*
     RenderImage("Affine0-Polar-Density.png",
                 CurryAll(AffineTransformations({ t0, t1 }), PolarFunc),
@@ -104,6 +107,8 @@ main(void)
               imageDim,
               imageDim);
 */
+
+  image.Release();
 
   return 0;
 }

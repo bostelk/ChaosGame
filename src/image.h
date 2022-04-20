@@ -72,6 +72,7 @@ struct Image
         , RowStrideBytes(ImageWidth* Channels)
         , Data(nullptr)
     {}
+    Image() : Image(0, 0) {}
 
     // Allocate data buffer.
     void Allocate()
@@ -83,14 +84,34 @@ struct Image
     // Free data buffer.
     void Release() { free(Data); }
 
+    size_t GetOffsetBytes(int x, int y)
+    {
+        size_t OffsetBytes = x * ColStrideBytes + y * RowStrideBytes;
+        assert(OffsetBytes < SizeBytes);
+        return OffsetBytes;
+    }
+
+    // Write a color to all pixels.
+    void Clear(Color24 color)
+    {
+        for (int y = 0; y < Height; y++) {
+            for (int x = 0; x < Width; x++) {
+                size_t OffsetBytes = GetOffsetBytes(x, y);
+                memcpy(Data + OffsetBytes, &color.Data, sizeof(Color24));
+            }
+        }
+    }
+
     // Write pixels to an image.
     void WritePixels(const std::vector<Pixel>& pixels)
     {
         for (const Pixel& pixel : pixels) {
-            size_t OffsetBytes = pixel.Coord[0] * ColStrideBytes + pixel.Coord[1] * RowStrideBytes;
-            assert(OffsetBytes < SizeBytes);
+            size_t OffsetBytes = GetOffsetBytes(pixel.Coord[0], pixel.Coord[1]);
             memcpy(Data + OffsetBytes, &pixel.Color.Data, sizeof(Color24));
         }
     }
+    
+    // Write image to PNG file.
+    int WriteFile(std::string filename);
 };
 

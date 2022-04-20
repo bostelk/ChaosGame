@@ -13,9 +13,6 @@
 #include <concurrent_vector.h>
 #include <ppl.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
-
 #include "simple.h"
 using namespace ispc;
 
@@ -281,6 +278,20 @@ JuliaFunc(Eigen::Vector2f& point)
   return newPoint;
 }
 
+static float translation1[2] = { 0, 0 };
+static float rotation1 = 0;
+static float scale1[2] = { 1, 1 };
+
+void
+SetTRS(float* translation, float rotation, float* scale)
+{
+  translation1[0] = translation[0];
+  translation1[1] = translation[1];
+  rotation1 = rotation;
+  scale1[0] = scale[0];
+  scale1[1] = scale[1];
+}
+
 void
 ChaosGameFor(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
 {
@@ -384,16 +395,18 @@ to_int(uint64_t x)
 }
 
 void
-ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, concurrency::concurrent_vector<int> &random, int numIterations = 20)
+ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions,
+                               concurrency::concurrent_vector<Eigen::Vector2f>& points,
+                               concurrency::concurrent_vector<int>& random,
+                               int numIterations = 20)
 {
   const int count = 16;
-  const int iterations = 20;
   const int matrixDim = 6;
 
   // Allocate input buffers.
   float xin[count];
   float yin[count];
-  int selectorin[count * iterations];
+  int* selectorin = (int*)malloc(count * numIterations * sizeof(int));
   float transformin[2 * matrixDim];
   float xout[count];
   float yout[count];
@@ -402,6 +415,17 @@ ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::
   t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404;
   Eigen::AffineCompact2f t1;
   t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389;
+
+  t0.translate(Eigen::Vector2f(translation1[0], translation1[1]));
+  t1.translate(Eigen::Vector2f(translation1[0], translation1[1]));
+
+  Eigen::Rotation2Df r0(rotation1/360*2*PI);
+
+  t0.rotate(r0);
+  t1.rotate(r0);
+
+  t1.scale(Eigen::Vector2f(scale1[0], scale1[1]));
+  t1.scale(Eigen::Vector2f(scale1[0], scale1[1]));
 
   memcpy(transformin, t0.data(), sizeof(float) * matrixDim);
 
@@ -423,32 +447,33 @@ ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::
       for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
         xin[inputIndex] = points[pointIndex + inputIndex][0];
         yin[inputIndex] = points[pointIndex + inputIndex][1];
-        for (int i = 0; i < iterations; ++i) {
-          selectorin[inputIndex * iterations + i] = random[((pointIndex + inputIndex) * iterations) + i];
+        for (int i = 0; i < numIterations; ++i) {
+          selectorin[inputIndex * numIterations + i] = random[((pointIndex + inputIndex) * numIterations) + i];
         }
       }
 
       // Call function from ispc file
-      affine(xin, yin, selectorin, transformin, xout, yout, iterations, count);
+      affine(xin, yin, selectorin, transformin, xout, yout, numIterations, count);
 
       for (int inputIndex = 0; inputIndex < count; ++inputIndex) {
         points[pointIndex + inputIndex] = Eigen::Vector2f(xout[inputIndex], yout[inputIndex]);
       }
     },
     concurrency::static_partitioner());
+
+  free(selectorin);
 }
 
 void
-RenderImage(std::string filename,
+RenderImage(Image image,
             std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>> ifs,
             std::function<Color24(const Pixel& p, const Image& image, int numPoints)> colorMap,
             int numPoints,
-            int imageWidth,
-            int imageHeight)
+            int numIterations)
 {
   auto start_image = std::chrono::high_resolution_clock::now();
 
-  printf("Render image: %s\n", filename.c_str());
+  // printf("Render image: %s\n", filename.c_str());
 
   std::chrono::steady_clock::time_point start_t;
   std::chrono::steady_clock::time_point end_t;
@@ -456,8 +481,6 @@ RenderImage(std::string filename,
 
   concurrency::concurrent_vector<Eigen::Vector2f> points;
   points.reserve(numPoints);
-
-  int numIterations = 20;
 
   concurrency::concurrent_vector<int> random;
   random.resize(numIterations * numPoints);
@@ -469,14 +492,14 @@ RenderImage(std::string filename,
 
   // Generate entropy in a single thread.
   concurrency::parallel_for(0, numPoints, [&](const size_t i) {
-      uint64_t hash0 = hash(seed0, i);
-      // A random point in biunit square [-1,1].
-      Eigen::Vector2f point = to_vec2(hash0);
-      points.push_back(point);
-      for (int j = 0; j < numIterations; j++) {
-          uint64_t hash1 = hash(seed1, i * j);
-          random[i * numIterations + j] = to_int(hash1) % ifs.size();
-      }
+    uint64_t hash0 = hash(seed0, i);
+    // A random point in biunit square [-1,1].
+    Eigen::Vector2f point = to_vec2(hash0);
+    points.push_back(point);
+    for (int j = 0; j < numIterations; j++) {
+      uint64_t hash1 = hash(seed1, i * j);
+      random[i * numIterations + j] = to_int(hash1) % ifs.size();
+    }
   });
 
   end_t = std::chrono::high_resolution_clock::now();
@@ -495,8 +518,8 @@ RenderImage(std::string filename,
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
   std::cout << "  Sampled " << numPoints << " points in " << int_s.count() << " milliseconds." << std::endl;
 
-  Image image(imageWidth, imageHeight);
-  image.Allocate();
+  // Image image(imageWidth, imageHeight);
+  // image.Allocate();
 
   concurrency::concurrent_unordered_map<CoordKey, Pixel> pixelMap;
 
@@ -552,13 +575,13 @@ RenderImage(std::string filename,
 
   image.WritePixels(pixels);
 
-  stbi_write_png(filename.c_str(), image.Width, image.Height, image.Channels, image.Data, image.RowStrideBytes);
+  // stbi_write_png(filename.c_str(), image.Width, image.Height, image.Channels, image.Data, image.RowStrideBytes);
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
   std::cout << "  Write image to file in " << int_s.count() << " milliseconds." << std::endl;
 
-  image.Release();
+  // image.Release();
 
   end_t = std::chrono::high_resolution_clock::now();
   auto int_ms = std::chrono::duration_cast<std::chrono::seconds>(end_t - start_image);
@@ -586,8 +609,10 @@ RenderAnimation(std::string filename, std::function<Color24(const Pixel& p, cons
     memset(buffer, 0, 2048);
 
     snprintf(buffer, 2048, "output/frame%04d.png", frameIndex);
+    std::string imageFilename(buffer, 2048);
 
-    RenderImage(std::string(buffer, 2048), CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc), colorMap, numPoints, imageWidth, imageHeight);
+    Image image;
+    RenderImage(image, CurryAll(AffineTransformations({ t0, t1 }), SphericalFunc), colorMap, numPoints, 20);
 
     std::cout << "Rendered animate frame "
               << "(" << frameIndex << "/" << numFrames << ").";
