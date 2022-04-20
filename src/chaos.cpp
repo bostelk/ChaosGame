@@ -354,51 +354,51 @@ ChaosGameSierpinskiISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2
 void
 ChaosGameAffineISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
 {
-    const int count = 16;
-    const int iterations = 20;
-    const int matrixDim = 9;
+  const int count = 16;
+  const int iterations = 20;
+  const int matrixDim = 9;
 
-    // Allocate input buffers.
-    float xin[count];
-    float yin[count];
-    int selectorin[count * iterations];
-    float transformin[2 * matrixDim];
-    float xout[count];
-    float yout[count];
+  // Allocate input buffers.
+  float xin[count];
+  float yin[count];
+  int selectorin[count * iterations];
+  float transformin[2 * matrixDim];
+  float xout[count];
+  float yout[count];
 
-    Eigen::Affine2f t0;
-    t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404, 0, 0, 1;
-    Eigen::Affine2f t1;
-    t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0, 0, 1;
+  Eigen::Affine2f t0;
+  t0.matrix() << 0.562482f, 0.397861f, -0.539599f, 0.501088, -.42992, -.112404, 0, 0, 1;
+  Eigen::Affine2f t1;
+  t1.matrix() << 0.830039, -0.496174, 0.16248, 0.750468, 0.91022, 0.288389, 0, 0, 1;
 
-    memcpy(transformin, t0.data(), sizeof(float) * matrixDim);
+  memcpy(transformin, t0.data(), sizeof(float) * matrixDim);
 
-    size_t offsetBytes = sizeof(float) * matrixDim;
-    memcpy(transformin + matrixDim, t1.data(), sizeof(float) * matrixDim);
+  size_t offsetBytes = sizeof(float) * matrixDim;
+  memcpy(transformin + matrixDim, t1.data(), sizeof(float) * matrixDim);
 
-    // Todo(kbostelmann): Sample remainder points.
-    int remainder = points.size() % count;
+  // Todo(kbostelmann): Sample remainder points.
+  int remainder = points.size() % count;
 
-    for (size_t pointIndex = 0; pointIndex < points.size() - count; pointIndex += count) {
+  for (size_t pointIndex = 0; pointIndex < points.size() - count; pointIndex += count) {
 #if _DEBUG
-        printf("  Sample point: %ld\n", pointIndex);
+    printf("  Sample point: %ld\n", pointIndex);
 #endif
-        // Initialize input buffer
-        for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
-            xin[inputIndex] = points[pointIndex + inputIndex][0];
-            yin[inputIndex] = points[pointIndex + inputIndex][1];
-            for (int i = 0; i < iterations; ++i) {
-                selectorin[inputIndex * iterations + i] = random[((pointIndex + inputIndex) * iterations) + i];
-            }
-        }
-
-        // Call function from ispc file
-        affine(xin, yin, selectorin, transformin, xout, yout, iterations, count);
-
-        for (int inputIndex = 0; inputIndex < count; ++inputIndex) {
-            points[pointIndex + inputIndex] = Eigen::Vector2f(xout[inputIndex], yout[inputIndex]);
-        }
+    // Initialize input buffer
+    for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
+      xin[inputIndex] = points[pointIndex + inputIndex][0];
+      yin[inputIndex] = points[pointIndex + inputIndex][1];
+      for (int i = 0; i < iterations; ++i) {
+        selectorin[inputIndex * iterations + i] = random[((pointIndex + inputIndex) * iterations) + i];
+      }
     }
+
+    // Call function from ispc file
+    affine(xin, yin, selectorin, transformin, xout, yout, iterations, count);
+
+    for (int inputIndex = 0; inputIndex < count; ++inputIndex) {
+      points[pointIndex + inputIndex] = Eigen::Vector2f(xout[inputIndex], yout[inputIndex]);
+    }
+  }
 }
 
 void
@@ -441,9 +441,9 @@ RenderImage(std::string filename,
   start_t = std::chrono::high_resolution_clock::now();
 
   // Sample points.
-  //ChaosGameFor(ifs, points, random.data(), numIterations);
-  //ChaosGameParallelFor(ifs, points, random.data(), numIterations);
-  //ChaosGameSierpinskiISPC(ifs, points, random.data(), numIterations);
+  // ChaosGameFor(ifs, points, random.data(), numIterations);
+  // ChaosGameParallelFor(ifs, points, random.data(), numIterations);
+  // ChaosGameSierpinskiISPC(ifs, points, random.data(), numIterations);
   ChaosGameAffineISPC(ifs, points, random.data(), numIterations);
 
   end_t = std::chrono::high_resolution_clock::now();
