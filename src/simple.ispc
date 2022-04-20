@@ -68,11 +68,11 @@ export void affine(uniform float xin[], uniform float yin[], uniform int selecto
             if (selector == 1)
             {
                 // Next matrix.
-                transformin_off += 9;
+                transformin_off += 6;
             }
 
-            float x1 = transformin_off[0] * x + transformin_off[3] * y + transformin_off[6];
-            float y1 = transformin_off[1] * x + transformin_off[4] * y + transformin_off[7];
+            float x1 = transformin_off[0] * x + transformin_off[2] * y + transformin_off[4];
+            float y1 = transformin_off[1] * x + transformin_off[3] * y + transformin_off[5];
 
             x = x1;
             y = y1;
