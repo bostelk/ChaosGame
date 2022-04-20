@@ -375,6 +375,14 @@ to_vec2(uint64_t x)
   return *((Eigen::Vector2f*)&x) - Eigen::Vector2f(1.0, 1.0);
 }
 
+int
+to_int(uint64_t x)
+{
+  x &= 0x007FFFFF007FFFFFULL;
+  x |= 0x3f8000003f800000ULL;
+  return *((int*)&x);
+}
+
 void
 ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
 {
@@ -442,6 +450,10 @@ RenderImage(std::string filename,
 
   printf("Render image: %s\n", filename.c_str());
 
+  std::chrono::steady_clock::time_point start_t;
+  std::chrono::steady_clock::time_point end_t;
+  std::chrono::milliseconds int_s;
+
   concurrency::concurrent_vector<Eigen::Vector2f> points;
   points.reserve(numPoints);
 
@@ -452,23 +464,23 @@ RenderImage(std::string filename,
 
   auto start_t = std::chrono::high_resolution_clock::now();
 
-  uint64_t seed = rand();
+  uint64_t seed0 = rand();
+  uint64_t seed1 = rand();
 
   // Generate entropy in a single thread.
   for (int i = 0; i < numPoints; i++) {
-    uint64_t hash1 = hash(seed, i);
-
+    uint64_t hash0 = hash(seed0, i);
     // A random point in biunit square [-1,1].
-    Eigen::Vector2f point = to_vec2(hash1);
+    Eigen::Vector2f point = to_vec2(hash0);
     points.push_back(point);
-
     for (int j = 0; j < numIterations; j++) {
-      random[i * numIterations + j] = rand() % ifs.size();
+      uint64_t hash1 = hash(seed1, i * j);
+      random[i * numIterations + j] = to_int(hash1) % ifs.size();
     }
   }
 
-  auto end_t = std::chrono::high_resolution_clock::now();
-  auto int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
+  end_t = std::chrono::high_resolution_clock::now();
+  int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
   std::cout << "  Generated entropy in " << int_s.count() << " milliseconds." << std::endl;
 
   start_t = std::chrono::high_resolution_clock::now();
