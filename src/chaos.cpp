@@ -352,7 +352,7 @@ ChaosGameSierpinskiISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2
 }
 
 void
-ChaosGameAffineISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
+ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
 {
   const int count = 16;
   const int iterations = 20;
@@ -379,26 +379,31 @@ ChaosGameAffineISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>
   // Todo(kbostelmann): Sample remainder points.
   int remainder = points.size() % count;
 
-  for (size_t pointIndex = 0; pointIndex < points.size() - count; pointIndex += count) {
+  concurrency::parallel_for(
+    size_t(0),
+    points.size() / count,
+    [&](size_t n) {
+      size_t pointIndex = n * count;
 #if _DEBUG
-    printf("  Sample point: %ld\n", pointIndex);
+      printf("  Sample point: %ld\n", pointIndex);
 #endif
-    // Initialize input buffer
-    for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
-      xin[inputIndex] = points[pointIndex + inputIndex][0];
-      yin[inputIndex] = points[pointIndex + inputIndex][1];
-      for (int i = 0; i < iterations; ++i) {
-        selectorin[inputIndex * iterations + i] = random[((pointIndex + inputIndex) * iterations) + i];
+      // Initialize input buffer
+      for (size_t inputIndex = 0; inputIndex < count; ++inputIndex) {
+        xin[inputIndex] = points[pointIndex + inputIndex][0];
+        yin[inputIndex] = points[pointIndex + inputIndex][1];
+        for (int i = 0; i < iterations; ++i) {
+          selectorin[inputIndex * iterations + i] = random[((pointIndex + inputIndex) * iterations) + i];
+        }
       }
-    }
 
-    // Call function from ispc file
-    affine(xin, yin, selectorin, transformin, xout, yout, iterations, count);
+      // Call function from ispc file
+      affine(xin, yin, selectorin, transformin, xout, yout, iterations, count);
 
-    for (int inputIndex = 0; inputIndex < count; ++inputIndex) {
-      points[pointIndex + inputIndex] = Eigen::Vector2f(xout[inputIndex], yout[inputIndex]);
-    }
-  }
+      for (int inputIndex = 0; inputIndex < count; ++inputIndex) {
+        points[pointIndex + inputIndex] = Eigen::Vector2f(xout[inputIndex], yout[inputIndex]);
+      }
+    },
+    concurrency::static_partitioner());
 }
 
 void
@@ -444,11 +449,11 @@ RenderImage(std::string filename,
   // ChaosGameFor(ifs, points, random.data(), numIterations);
   // ChaosGameParallelFor(ifs, points, random.data(), numIterations);
   // ChaosGameSierpinskiISPC(ifs, points, random.data(), numIterations);
-  ChaosGameAffineISPC(ifs, points, random.data(), numIterations);
+  ChaosGameAffineParallelForISPC(ifs, points, random.data(), numIterations);
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
-  std::cout << "  Sampled points in " << int_s.count() << " milliseconds." << std::endl;
+  std::cout << "  Sampled " << numPoints << " points in " << int_s.count() << " milliseconds." << std::endl;
 
   Image image(imageWidth, imageHeight);
   image.Allocate();
