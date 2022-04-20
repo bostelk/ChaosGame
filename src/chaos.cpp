@@ -384,7 +384,7 @@ to_int(uint64_t x)
 }
 
 void
-ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, int* random, int numIterations = 20)
+ChaosGameAffineParallelForISPC(std::vector<std::function<Eigen::Vector2f(Eigen::Vector2f&)>>& functions, concurrency::concurrent_vector<Eigen::Vector2f>& points, concurrency::concurrent_vector<int> &random, int numIterations = 20)
 {
   const int count = 16;
   const int iterations = 20;
@@ -459,25 +459,25 @@ RenderImage(std::string filename,
 
   int numIterations = 20;
 
-  std::vector<int> random;
+  concurrency::concurrent_vector<int> random;
   random.resize(numIterations * numPoints);
 
-  auto start_t = std::chrono::high_resolution_clock::now();
+  start_t = std::chrono::high_resolution_clock::now();
 
   uint64_t seed0 = rand();
   uint64_t seed1 = rand();
 
   // Generate entropy in a single thread.
-  for (int i = 0; i < numPoints; i++) {
-    uint64_t hash0 = hash(seed0, i);
-    // A random point in biunit square [-1,1].
-    Eigen::Vector2f point = to_vec2(hash0);
-    points.push_back(point);
-    for (int j = 0; j < numIterations; j++) {
-      uint64_t hash1 = hash(seed1, i * j);
-      random[i * numIterations + j] = to_int(hash1) % ifs.size();
-    }
-  }
+  concurrency::parallel_for(0, numPoints, [&](const size_t i) {
+      uint64_t hash0 = hash(seed0, i);
+      // A random point in biunit square [-1,1].
+      Eigen::Vector2f point = to_vec2(hash0);
+      points.push_back(point);
+      for (int j = 0; j < numIterations; j++) {
+          uint64_t hash1 = hash(seed1, i * j);
+          random[i * numIterations + j] = to_int(hash1) % ifs.size();
+      }
+  });
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
@@ -489,7 +489,7 @@ RenderImage(std::string filename,
   // ChaosGameFor(ifs, points, random.data(), numIterations);
   // ChaosGameParallelFor(ifs, points, random.data(), numIterations);
   // ChaosGameSierpinskiISPC(ifs, points, random.data(), numIterations);
-  ChaosGameAffineParallelForISPC(ifs, points, random.data(), numIterations);
+  ChaosGameAffineParallelForISPC(ifs, points, random, numIterations);
 
   end_t = std::chrono::high_resolution_clock::now();
   int_s = std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
