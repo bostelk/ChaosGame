@@ -1,10 +1,13 @@
 ChasoGame
 =========
 
+Implementation of the [Fractal flame algorithm](docs/flame.pdf).
+
 Output
 ------
 An example image:
-![Image of fractal](images/image-0.png)
+
+<img src="images/image-0.png" width="50%" alt="Image of fractal"/>
 
 An example output:
 ```
