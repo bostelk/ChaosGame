@@ -3,6 +3,9 @@ ChasoGame
 
 Output
 ------
+An example image:
+![Image of fractal](images/image-0.png)
+
 An example output:
 ```
 Render animation: 1800
