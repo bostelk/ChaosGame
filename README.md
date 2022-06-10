@@ -7,7 +7,7 @@ Output
 ------
 An example image:
 
-<img src="images/image-0.png" width="50%" alt="Image of fractal"/>
+<img src="images/image-0.png" width="25%" alt="Image of fractal"/>
 
 An example output:
 ```
