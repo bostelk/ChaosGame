@@ -7,7 +7,7 @@ Output
 ------
 An example image:
 
-<img src="images/image-0.png" width="25%" alt="Image of fractal"/>
+![Image of fractal](images/image-4-1024.png)
 
 An example output:
 ```
